@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CPU Scheduling Simulator</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #141720;
+      --surface2: #1c2030;
+      --border: #2a2f42;
+      --accent: #4f8ef7;
+      --accent2: #1adb8a;
+      --accent3: #ff6b4a;
+      --text: #e8ecf5;
+      --muted: #6b748f;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      padding: 24px 20px;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,142,247,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,142,247,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+
+    /* Header */
+    header { margin-bottom: 32px; }
+    .header-tag {
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    header h1 {
+      font-family: var(--font-head);
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.1;
+    }
+    header h1 span { color: var(--accent); }
+    header p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* Tabs */
+    .algo-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 8px 20px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface);
+      transition: all .15s;
+      letter-spacing: .05em;
+    }
+    .tab:hover { border-color: var(--accent); color: var(--accent); }
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Grid layout */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media(max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-title {
+      font-family: var(--font-head);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 8px;
+      display: inline-block;
+    }
+
+    /* Process rows */
+    .proc-row {
+      display: grid;
+      grid-template-columns: 70px 1fr 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .proc-row-sjf {
+      display: grid;
+      grid-template-columns: 70px 1fr 1fr 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .proc-header {
+      display: grid;
+      grid-template-columns: 70px 1fr 1fr auto;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .proc-header-sjf {
+      display: grid;
+      grid-template-columns: 70px 1fr 1fr 1fr auto;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .col-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: .06em;
+    }
+
+    input[type=number], input[type=text] {
+      width: 100%;
+      padding: 7px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .btn {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--surface2);
+      color: var(--text);
+      transition: all .15s;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-del { background: transparent; border-color: transparent; color: var(--muted); font-size: 16px; padding: 4px 8px; }
+    .btn-del:hover { color: var(--accent3); border-color: transparent; }
+    .btn-add { width: 100%; margin-top: 4px; background: var(--surface2); text-align: center; }
+    .btn-run {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+    }
+    .btn-run:hover { background: #3a7be8; border-color: #3a7be8; color: #fff; }
+    .btn-reset { font-size: 10px; color: var(--muted); background: transparent; border: none; cursor: pointer; font-family: var(--font-mono); }
+    .btn-reset:hover { color: var(--accent); }
+
+    .quantum-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .quantum-row label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .quantum-row input { max-width: 70px; }
+
+    /* Gantt */
+    .gantt-wrap { overflow-x: auto; padding-bottom: 4px; }
+    .gantt-bar-row { display: flex; gap: 3px; min-height: 44px; align-items: stretch; }
+    .gantt-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 5px;
+      min-width: 10px;
+      flex-shrink: 0;
+      letter-spacing: .04em;
+    }
+    .gantt-ticks { display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: var(--muted); }
+
+    /* Metrics */
+    .metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 16px; }
+    .metric {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .metric-val { font-size: 22px; font-weight: 700; font-family: var(--font-head); color: var(--accent); }
+    .metric-lbl { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: .06em; text-transform: uppercase; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+    }
+    tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface2); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      color: #fff;
+    }
+
+    /* Algo description */
+    .algo-desc-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 12px 12px 0;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .algo-desc-box p { font-size: 12px; color: var(--muted); line-height: 1.8; }
+
+    .empty { font-size: 12px; color: var(--muted); text-align: center; padding: 20px 0; }
+
+    /* Legend */
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="header-tag">// OS Mini Project</div>
+    <h1>CPU <span>Scheduling</span> Simulator</h1>
+    <p>FCFS &nbsp;&bull;&nbsp; SJF (Non-preemptive) &nbsp;&bull;&nbsp; Round Robin &mdash; Gantt chart + metrics</p>
+  </header>
+
+  <!-- Algorithm tabs -->
+  <div class="algo-tabs">
+    <button class="tab active" onclick="setAlgo('fcfs',this)">FCFS</button>
+    <button class="tab" onclick="setAlgo('sjf',this)">SJF</button>
+    <button class="tab" onclick="setAlgo('rr',this)">Round Robin</button>
+  </div>
+
+  <!-- Algorithm description -->
+  <div class="algo-desc-box">
+    <p id="algo-desc"></p>
+  </div>
+
+  <div class="grid">
+
+    <!-- Input Card -->
+    <div class="card">
+      <div class="card-title">
+        <span><span class="dot"></span>Process Input</span>
+        <button class="btn-reset" onclick="resetProcesses()">↺ Reset</button>
+      </div>
+
+      <div id="rr-quantum" style="display:none">
+        <div class="quantum-row">
+          <label>Time Quantum (q):</label>
+          <input type="number" id="quantum" value="2" min="1" max="20"/>
+        </div>
+      </div>
+
+      <div id="proc-header" class="proc-header">
+        <span class="col-lbl">ID</span>
+        <span class="col-lbl">Arrival</span>
+        <span class="col-lbl">Burst</span>
+        <span></span>
+      </div>
+      <div id="proc-list"></div>
+      <button class="btn btn-add" onclick="addProcess()">+ Add Process</button>
+      <button class="btn btn-run" onclick="runSimulation()">▶ Run Simulation</button>
+    </div>
+
+    <!-- Gantt + Metrics -->
+    <div class="card">
+      <div class="card-title"><span><span class="dot" style="background:var(--accent2)"></span>Gantt Chart</span></div>
+      <div id="legend" class="legend"></div>
+      <div class="gantt-wrap">
+        <div id="gantt-out"><p class="empty">Run simulation to view Gantt chart.</p></div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-val" id="m-awt">—</div><div class="metric-lbl">Avg Wait</div></div>
+        <div class="metric"><div class="metric-val" id="m-att">—</div><div class="metric-lbl">Avg TAT</div></div>
+        <div class="metric"><div class="metric-val" id="m-cpu" style="color:var(--accent2)">—</div><div class="metric-lbl">CPU Util</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Process Result Table -->
+  <div class="card">
+    <div class="card-title"><span><span class="dot" style="background:var(--accent3)"></span>Scheduling Results</span></div>
+    <div id="proc-table"><p class="empty">Results will appear here after simulation.</p></div>
+  </div>
+
+</div>
+
+<script>
+  const COLORS = ['#4f8ef7','#1adb8a','#ff6b4a','#a78bfa','#f59e0b','#ec4899','#06b6d4','#84cc16','#f97316','#8b5cf6'];
+  const DESCS = {
+    fcfs: 'First Come First Served (FCFS) — Processes are executed in the order they arrive in the ready queue. It is non-preemptive: once a process starts, it runs to completion. Simple to implement but can suffer from the "convoy effect" where short processes wait behind long ones.',
+    sjf:  'Shortest Job First (SJF) — Among all arrived processes, the one with the smallest CPU burst time is selected next. Non-preemptive: the running process is never interrupted. Optimal average waiting time, but requires knowing burst times in advance. Starvation possible for long processes.',
+    rr:   'Round Robin (RR) — Each process gets a fixed time slice (quantum q). If not finished, it goes to the back of the ready queue. Preemptive and fair. Good for time-sharing systems. Avg waiting time depends heavily on the quantum value — smaller q = more context switches but better response time.'
+  };
+
+  let algo = 'fcfs';
+  let procs = [];
+  let pid = 1;
+
+  function setAlgo(a, el) {
+    algo = a;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('rr-quantum').style.display = a === 'rr' ? 'block' : 'none';
+    document.getElementById('algo-desc').textContent = DESCS[a];
+    renderProcList();
+  }
+
+  function addProcess() {
+    procs.push({ id: 'P' + pid++, arrival: 0, burst: Math.floor(Math.random() * 8) + 1, priority: 1 });
+    renderProcList();
+  }
+
+  function removeProcess(i) {
+    procs.splice(i, 1);
+    renderProcList();
+  }
+
+  function resetProcesses() {
+    pid = 5;
+    procs = [
+      { id: 'P1', arrival: 0, burst: 6, priority: 2 },
+      { id: 'P2', arrival: 2, burst: 4, priority: 1 },
+      { id: 'P3', arrival: 4, burst: 2, priority: 3 },
+      { id: 'P4', arrival: 6, burst: 8, priority: 2 }
+    ];
+    renderProcList();
+    document.getElementById('gantt-out').innerHTML = '<p class="empty">Run simulation to view Gantt chart.</p>';
+    document.getElementById('proc-table').innerHTML = '<p class="empty">Results will appear here after simulation.</p>';
+    document.getElementById('legend').innerHTML = '';
+    ['m-awt','m-att','m-cpu'].forEach(id => document.getElementById(id).textContent = '—');
+  }
+
+  function renderProcList() {
+    const isSJF = algo === 'sjf';
+    const ph = document.getElementById('proc-header');
+    if (isSJF) {
+      ph.className = 'proc-header-sjf';
+      ph.innerHTML = '<span class="col-lbl">ID</span><span class="col-lbl">Arrival</span><span class="col-lbl">Burst</span><span class="col-lbl">Priority</span><span></span>';
+    } else {
+      ph.className = 'proc-header';
+      ph.innerHTML = '<span class="col-lbl">ID</span><span class="col-lbl">Arrival</span><span class="col-lbl">Burst</span><span></span>';
+    }
+    document.getElementById('proc-list').innerHTML = procs.map((p, i) => `
+      <div class="${isSJF ? 'proc-row-sjf' : 'proc-row'}">
+        <input type="text" value="${p.id}" onchange="procs[${i}].id=this.value"/>
+        <input type="number" value="${p.arrival}" min="0" onchange="procs[${i}].arrival=+this.value"/>
+        <input type="number" value="${p.burst}" min="1" onchange="procs[${i}].burst=+this.value"/>
+        ${isSJF ? `<input type="number" value="${p.priority||1}" min="1" onchange="procs[${i}].priority=+this.value"/>` : ''}
+        <button class="btn btn-del" onclick="removeProcess(${i})">×</button>
+      </div>`).join('');
+  }
+
+  function runSimulation() {
+    if (!procs.length) { alert('Add at least one process.'); return; }
+    const ps = procs.map((p, i) => ({ ...p, color: COLORS[i % COLORS.length] }));
+    let timeline = [];
+    if (algo === 'fcfs') timeline = runFCFS(ps);
+    else if (algo === 'sjf') timeline = runSJF(ps);
+    else timeline = runRR(ps, +document.getElementById('quantum').value);
+    renderGantt(timeline, ps);
+    renderTable(timeline, ps);
+  }
+
+  function runFCFS(ps) {
+    const sorted = [...ps].sort((a, b) => a.arrival - b.arrival || a.id.localeCompare(b.id));
+    let t = 0, tl = [];
+    for (const p of sorted) {
+      if (t < p.arrival) { tl.push({ id: 'Idle', start: t, end: p.arrival, color: '#2a2f42' }); t = p.arrival; }
+      tl.push({ id: p.id, start: t, end: t + p.burst, color: p.color });
+      t += p.burst;
+    }
+    return tl;
+  }
+
+  function runSJF(ps) {
+    const all = [...ps].map(p => ({ ...p }));
+    let t = 0, tl = [], done = new Set();
+    while (done.size < ps.length) {
+      const avail = all.filter(p => !done.has(p.id) && p.arrival <= t);
+      if (!avail.length) {
+        const next = all.filter(p => !done.has(p.id)).sort((a,b) => a.arrival - b.arrival)[0];
+        tl.push({ id: 'Idle', start: t, end: next.arrival, color: '#2a2f42' });
+        t = next.arrival; continue;
+      }
+      const p = avail.sort((a, b) => a.burst - b.burst || a.arrival - b.arrival)[0];
+      tl.push({ id: p.id, start: t, end: t + p.burst, color: p.color });
+      t += p.burst; done.add(p.id);
+    }
+    return tl;
+  }
+
+  function runRR(ps, q) {
+    const all = [...ps].map(p => ({ ...p, rem: p.burst })).sort((a,b) => a.arrival - b.arrival);
+    let t = 0, tl = [], ready = [], idx = 0;
+    while (ready.length || idx < all.length) {
+      while (idx < all.length && all[idx].arrival <= t) ready.push(all[idx++]);
+      if (!ready.length) {
+        tl.push({ id: 'Idle', start: t, end: all[idx].arrival, color: '#2a2f42' });
+        t = all[idx].arrival;
+        while (idx < all.length && all[idx].arrival <= t) ready.push(all[idx++]);
+        continue;
+      }
+      const p = ready.shift();
+      const run = Math.min(q, p.rem);
+      tl.push({ id: p.id, start: t, end: t + run, color: ps.find(x => x.id === p.id).color });
+      t += run; p.rem -= run;
+      while (idx < all.length && all[idx].arrival <= t) ready.push(all[idx++]);
+      if (p.rem > 0) ready.push(p);
+    }
+    return tl;
+  }
+
+  function renderGantt(tl, ps) {
+    const total = tl[tl.length - 1].end;
+    // Build legend
+    const seen = new Set();
+    let legendHTML = '';
+    tl.forEach(s => {
+      if (s.id !== 'Idle' && !seen.has(s.id)) {
+        seen.add(s.id);
+        legendHTML += `<div class="legend-item"><span class="legend-dot" style="background:${s.color}"></span>${s.id}</div>`;
+      }
+    });
+    document.getElementById('legend').innerHTML = legendHTML;
+
+    // Gantt bars
+    let barsHTML = tl.map(s => {
+      const pct = ((s.end - s.start) / total * 100).toFixed(2);
+      return `<div class="gantt-cell" style="width:${pct}%;background:${s.color};opacity:${s.id==='Idle'?0.4:1}">${s.id==='Idle'?'':s.id}</div>`;
+    }).join('');
+
+    // Time ticks
+    const tickSet = new Set();
+    tl.forEach(s => { tickSet.add(s.start); tickSet.add(s.end); });
+    const ticks = [...tickSet].sort((a,b)=>a-b);
+    const ticksHTML = ticks.map(t =>
+      `<span style="position:absolute;left:${(t/total*100).toFixed(2)}%;transform:translateX(-50%)">${t}</span>`
+    ).join('');
+
+    document.getElementById('gantt-out').innerHTML = `
+      <div class="gantt-bar-row">${barsHTML}</div>
+      <div style="position:relative;height:18px;margin-top:4px;font-size:10px;color:var(--muted)">${ticksHTML}</div>`;
+  }
+
+  function renderTable(tl, ps) {
+    const stats = {};
+    ps.forEach(p => {
+      const segs = tl.filter(s => s.id === p.id);
+      if (!segs.length) return;
+      const ct = segs[segs.length - 1].end;
+      const ft = segs[0].start;
+      const wt = ft - p.arrival;
+      const tat = ct - p.arrival;
+      const rt = ft - p.arrival;
+      stats[p.id] = { ct, wt, tat, rt, color: p.color };
+    });
+
+    const rows = ps.map(p => {
+      const s = stats[p.id];
+      if (!s) return '';
+      return `<tr>
+        <td><span class="badge" style="background:${s.color}">${p.id}</span></td>
+        <td>${p.arrival}</td>
+        <td>${p.burst}</td>
+        <td>${s.rt}</td>
+        <td>${s.wt}</td>
+        <td>${s.tat}</td>
+        <td>${s.ct}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('proc-table').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Process</th><th>Arrival Time</th><th>Burst Time</th>
+          <th>Response Time</th><th>Waiting Time</th><th>Turnaround Time</th><th>Completion Time</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    const vals = Object.values(stats);
+    const awt = (vals.reduce((a,v) => a + v.wt, 0) / vals.length).toFixed(2);
+    const att = (vals.reduce((a,v) => a + v.tat, 0) / vals.length).toFixed(2);
+    const busy = tl.filter(s => s.id !== 'Idle').reduce((a,s) => a + (s.end - s.start), 0);
+    const total = tl[tl.length-1].end - tl[0].start;
+    const cpu = ((busy / total) * 100).toFixed(1) + '%';
+    document.getElementById('m-awt').textContent = awt;
+    document.getElementById('m-att').textContent = att;
+    document.getElementById('m-cpu').textContent = cpu;
+  }
+
+  // Init
+  resetProcesses();
+  document.getElementById('algo-desc').textContent = DESCS['fcfs'];
+</script>
+</body>
+</html>
